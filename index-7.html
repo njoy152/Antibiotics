@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>ICU Antibiotic Selector — Updated</title>
+<style>
+:root{--bg:#0b1220;--panel:#121c2f;--panel2:#17233a;--text:#eef4ff;--muted:#9bb0d1;--green:#18a957;--yellow:#f0b429;--orange:#c98b0d;--red:#db4b4b;--purple:#8b5cf6;--blue:#2997ff;--shadow:0 10px 30px rgba(0,0,0,.24);--radius:18px}
+*{box-sizing:border-box}html,body{min-height:100%;margin:0}
+body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text);background:radial-gradient(circle at top right, rgba(41,151,255,.10), transparent 30%),radial-gradient(circle at top left, rgba(17,182,165,.08), transparent 28%),var(--bg);overflow-x:hidden}
+.app{min-height:100vh;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:30;background:rgba(11,18,32,.94);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.06);padding:12px}
+.topbar-inner{display:grid;grid-template-columns:1.2fr 1.2fr .9fr 1fr auto;gap:10px;align-items:stretch}
+.card-shell,.summary-card,.panel,.bottom-card{background:linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.07);border-radius:var(--radius);box-shadow:var(--shadow)}
+.field{padding:10px;display:grid;gap:6px;align-content:center}
+.field label{font-size:12px;color:var(--muted);letter-spacing:.02em}
+.field select,.toggle-wrap{width:100%;min-height:54px;border:0;outline:none;border-radius:12px;background:var(--panel2);color:var(--text);padding:0 14px;font-size:15px;font-weight:600}
+.toggle-wrap{display:flex;align-items:center;gap:10px;user-select:none}
+.toggle-wrap input{width:18px;height:18px;accent-color:var(--blue)}
+.swap-btn{border:1px solid rgba(255,255,255,.07);background:linear-gradient(180deg,#1a2740,#132036);color:var(--text);border-radius:var(--radius);min-width:66px;font-size:22px;cursor:pointer;box-shadow:var(--shadow)}
+.swap-btn:disabled{opacity:.4;cursor:not-allowed}
+.main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px;padding:12px;align-items:start}
+.left{min-width:0;display:grid;gap:12px;align-content:start}
+.summary-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.summary-card{padding:14px;display:grid;gap:6px;min-height:86px}
+.summary-label{font-size:12px;color:var(--muted)}.summary-value{font-size:30px;font-weight:800;line-height:1}.summary-sub{font-size:12px;color:var(--muted)}
+.coverage-group{margin-bottom:18px}
+.group-header{position:sticky;top:92px;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:rgba(11,18,32,.94);border:1px solid rgba(255,255,255,.06);border-radius:14px;margin-bottom:10px;backdrop-filter:blur(8px)}
+.group-title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800}
+.group-sub{color:var(--muted);font-size:12px}
+.coverage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.bug-card{border-radius:16px;padding:12px;min-height:108px;display:grid;gap:8px;align-content:start;border:1px solid rgba(255,255,255,.08);box-shadow:var(--shadow)}
+.cov-strong{background:linear-gradient(180deg, rgba(24,169,87,.35), rgba(24,169,87,.22))}
+.cov-moderate{background:linear-gradient(180deg, rgba(240,180,41,.35), rgba(240,180,41,.22))}
+.cov-weak{background:linear-gradient(180deg, rgba(201,139,13,.28), rgba(201,139,13,.18))}
+.cov-none{background:linear-gradient(180deg, rgba(219,75,75,.35), rgba(219,75,75,.22))}
+.cov-avoid{background:linear-gradient(180deg, rgba(128,74,74,.28), rgba(128,74,74,.18))}
+.bug-title{font-size:15px;font-weight:800}.bug-tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{padding:5px 8px;border-radius:999px;font-size:11px;font-weight:700;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.08)}
+.tag.route{background:rgba(41,151,255,.18)}.tag.res{background:rgba(139,92,246,.18)}
+.bug-note{font-size:12px;line-height:1.35;color:rgba(255,255,255,.86)}
+.right{display:grid;gap:12px;align-content:start}.panel{padding:12px}.panel h3,.bottom-card h3{margin:0 0 8px;font-size:16px}
+.list{display:grid;gap:8px}
+.list-item{border-radius:12px;padding:10px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);font-size:13px;line-height:1.45}
+.list-item strong{display:block;margin-bottom:4px}
+.bottom{padding:0 12px 12px;display:grid;grid-template-columns:1.4fr 1fr;gap:12px}
+.bottom-card{padding:12px}.footnote{font-size:11px;color:var(--muted);line-height:1.4}.hidden{display:none!important}
+@media (max-width:1180px){.topbar-inner{grid-template-columns:1fr 1fr 1fr 1fr}.main{grid-template-columns:1fr}.bottom{grid-template-columns:1fr}}
+@media (max-width:768px){.topbar{padding:10px}.topbar-inner{grid-template-columns:1fr 1fr}.main{padding:10px;gap:10px}.summary-row{grid-template-columns:repeat(2,1fr)}.coverage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.summary-value{font-size:24px}.group-header{top:84px}}
+@media (max-width:520px){.topbar-inner{grid-template-columns:1fr}.field select,.toggle-wrap{min-height:56px;font-size:16px}.coverage-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.bug-card{padding:10px;min-height:100px}.bug-title{font-size:14px}}
+</style>
+
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ICU Antibiotics" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon-192.png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="card-shell field">
+        <label for="abx1">Antibiotic slot 1</label>
+        <select id="abx1"></select>
+      </div>
+      <div class="card-shell field" id="abx2Field">
+        <label for="abx2">Antibiotic slot 2</label>
+        <select id="abx2"></select>
+      </div>
+      <div class="card-shell field">
+        <label for="siteMode">Probable infection focus</label>
+        <select id="siteMode">
+          <option value="undifferentiated">Undifferentiated sepsis</option>
+          <option value="vap">VAP / HAP</option>
+          <option value="cauti">CAUTI / complicated UTI</option>
+          <option value="bsi">Bloodstream / line infection</option>
+          <option value="iab">Intra-abdominal / perforation</option>
+          <option value="ssti">Post-op wound / SSTI</option>
+        </select>
+      </div>
+      <div class="card-shell field">
+        <label>Therapy mode</label>
+        <label class="toggle-wrap"><input type="checkbox" id="comboMode" checked />Combination therapy</label>
+      </div>
+      <button class="swap-btn" id="swapBtn" title="Swap antibiotics">⇄</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="left">
+      <div class="summary-row">
+        <div class="summary-card"><div class="summary-label">Covered targets</div><div class="summary-value" id="coveredCount">0</div><div class="summary-sub">Across current selection</div></div>
+        <div class="summary-card"><div class="summary-label">Strong coverage</div><div class="summary-value" id="strongCount">0</div><div class="summary-sub">Reliable empiric signals</div></div>
+        <div class="summary-card"><div class="summary-label">Priority gaps</div><div class="summary-value" id="gapCount">0</div><div class="summary-sub">Scenario-driven missing targets</div></div>
+        <div class="summary-card"><div class="summary-label">Route mix</div><div class="summary-value" id="routeMix">—</div><div class="summary-sub">Current regimen</div></div>
+        <div class="summary-card"><div class="summary-label">Spectrum profile</div><div class="summary-value" id="profileLabel">—</div><div class="summary-sub">High-level impression</div></div>
+      </div>
+      <div id="coveragePanel"></div>
+    </div>
+
+    <div class="right">
+      <div class="panel"><h3>Selected antibiotics</h3><div id="selectionSummary" class="list"></div></div>
+      <div class="panel"><h3>Empiric guidance</h3><div id="suggestionList" class="list"></div></div>
+      <div class="panel"><h3>Common adverse effects / cautions</h3><div id="complicationList" class="list"></div></div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="bottom-card"><h3>Coverage notes</h3><div id="coverageNotes"></div></div>
+    <div class="bottom-card"><h3>Safety note</h3><div class="footnote">This screen is a bedside decision-support aid, not a prescribing engine. Always confirm with the local antibiogram, source control needs, renal and hepatic adjustment rules, allergy history, and Infectious Diseases guidance. Coverage grades are simplified bedside labels for quick ICU review.</div></div>
+  </div>
+</div>
+
+<script>
+const gradeScore={avoid:-1,none:0,weak:1,moderate:2,strong:3};
+const gradeLabel={strong:"Strong",moderate:"Moderate",weak:"Weak",none:"None",avoid:"Avoid"};
+
+const pathogenGroups=[
+  {key:"gp",title:"Gram positive",sub:"Device infections, severe pneumonia, line infections, wound infections",badge:"🟢",items:[
+    {key:"MRSA",label:"MRSA",tags:["resistance","pneumonia","line"]},
+    {key:"MSSA",label:"MSSA",tags:["skin","bloodstream"]},
+    {key:"Enterococcus",label:"Enterococcus",tags:["urine","abdominal"]},
+    {key:"VRE",label:"VRE",tags:["resistance"]},
+    {key:"Strep",label:"Streptococci",tags:["respiratory"]}
+  ]},
+  {key:"gn",title:"Gram negative",sub:"Late ICU pneumonia, urinary sepsis, bacteremia, abdominal sepsis",badge:"🔵",items:[
+    {key:"E_coli",label:"E. coli",tags:["urine","abdominal"]},
+    {key:"Klebsiella",label:"Klebsiella",tags:["ESBL","bloodstream"]},
+    {key:"Pseudomonas",label:"Pseudomonas",tags:["VAP","ICU"]},
+    {key:"Acinetobacter",label:"Acinetobacter",tags:["MDR","ICU"]},
+    {key:"ESBL",label:"ESBL",tags:["resistance"]},
+    {key:"CRE",label:"CRE",tags:["resistance"]}
+  ]},
+  {key:"ana",title:"Anaerobes",sub:"Post-surgical abdomen, perforation, mixed wound infection, aspiration contexts",badge:"🟣",items:[
+    {key:"Bacteroides",label:"Bacteroides",tags:["abdomen","surgery"]},
+    {key:"Clostridium",label:"Clostridium",tags:["anaerobe"]}
+  ]}
+];
+
+const antibiotics=[
+  {key:"pip_tazo",name:"Piperacillin-Tazobactam",route:"IV",cls:"β-lactam / β-lactamase inhibitor",notes:"Broad empiric ICU agent with pseudomonal and anaerobic activity.",cautions:["AKI signal can rise when paired with vancomycin","sodium load","renal dose review"],coverage:{MSSA:"moderate",E_coli:"strong",Klebsiella:"strong",Pseudomonas:"strong",Enterococcus:"moderate",Bacteroides:"strong",ESBL:"weak"}},
+  {key:"cefoperazone_sulbactam",name:"Cefoperazone-Sulbactam",route:"IV",cls:"Cephalosporin / β-lactamase inhibitor",notes:"Common ICU option in many hospitals with mixed Gram-negative coverage.",cautions:["Bleeding risk in selected patients","hepatic/biliary review","renal review"],coverage:{MSSA:"moderate",E_coli:"strong",Klebsiella:"strong",Pseudomonas:"moderate",Acinetobacter:"moderate",Bacteroides:"moderate"}},
+  {key:"amp_sulbactam",name:"Ampicillin-Sulbactam",route:"IV",cls:"β-lactam / β-lactamase inhibitor",notes:"Useful for mixed flora and selected aspiration/post-op patterns.",cautions:["Hepatic monitoring","sodium load","renal dose review"],coverage:{MSSA:"moderate",Enterococcus:"moderate",E_coli:"weak",Acinetobacter:"moderate",Bacteroides:"moderate"}},
+  {key:"amox_clav",name:"Amoxicillin-Clavulanate",route:"PO",cls:"β-lactam / β-lactamase inhibitor",notes:"Community or step-down option; not an ICU anti-pseudomonal drug.",cautions:["Diarrhea","cholestatic liver injury risk","renal dose review"],coverage:{MSSA:"moderate",E_coli:"weak",Bacteroides:"moderate"}},
+  {key:"cefazolin",name:"Cefazolin",route:"IV",cls:"1st generation cephalosporin",notes:"Strong MSSA option; narrow ICU role outside directed therapy.",cautions:["Beta-lactam allergy review","renal dose review"],coverage:{MSSA:"strong",E_coli:"weak"}},
+  {key:"cefuroxime",name:"Cefuroxime",route:"IV/PO",cls:"2nd generation cephalosporin",notes:"Intermediate community spectrum; not dependable for ICU pseudomonas.",cautions:["Renal dose review","C. difficile risk"],coverage:{MSSA:"moderate",E_coli:"moderate"}},
+  {key:"ceftriaxone",name:"Ceftriaxone",route:"IV",cls:"3rd generation cephalosporin",notes:"Good CAP and bloodstream option; no pseudomonal coverage.",cautions:["Biliary sludging","C. difficile risk"],coverage:{E_coli:"strong",Klebsiella:"strong",Strep:"strong"}},
+  {key:"ceftazidime",name:"Ceftazidime",route:"IV",cls:"3rd generation cephalosporin (anti-pseudomonal)",notes:"Gram-negative leaning cephalosporin with pseudomonal activity.",cautions:["Neurotoxicity risk if renal impairment","C. difficile risk"],coverage:{Pseudomonas:"strong",E_coli:"strong"}},
+  {key:"cefepime",name:"Cefepime",route:"IV",cls:"4th generation cephalosporin",notes:"Broad Gram-negative ICU agent including pseudomonas.",cautions:["Neurotoxicity risk in renal impairment","dose adjust carefully"],coverage:{Pseudomonas:"strong",E_coli:"strong",MSSA:"moderate"}},
+  {key:"ceftaroline",name:"Ceftaroline",route:"IV",cls:"Advanced cephalosporin",notes:"Only cephalosporin here with dependable MRSA activity.",cautions:["Neutropenia with prolonged use","renal dose review"],coverage:{MRSA:"strong",MSSA:"strong",E_coli:"moderate"}},
+  {key:"meropenem",name:"Meropenem",route:"IV",cls:"Carbapenem",notes:"High-value ICU broad-spectrum agent with pseudomonas and anaerobic activity.",cautions:["Seizure risk review","renal dose review"],coverage:{Pseudomonas:"strong",E_coli:"strong",Klebsiella:"strong",ESBL:"strong",Bacteroides:"strong"}},
+  {key:"imipenem",name:"Imipenem",route:"IV",cls:"Carbapenem",notes:"Very broad ICU agent with pseudomonas and anaerobe activity.",cautions:["Higher seizure risk than some alternatives","renal dose review"],coverage:{Pseudomonas:"strong",E_coli:"strong",Bacteroides:"strong"}},
+  {key:"ertapenem",name:"Ertapenem",route:"IV",cls:"Carbapenem",notes:"Strong ESBL and anaerobe activity but no pseudomonal coverage.",cautions:["Seizure risk review","renal dose review"],coverage:{E_coli:"strong",Klebsiella:"strong",ESBL:"strong",Bacteroides:"strong"}},
+  {key:"ceftazidime_avibactam",name:"Ceftazidime-Avibactam",route:"IV",cls:"Advanced β-lactam / inhibitor",notes:"Important modern ICU option for CRE/ESBL pathways.",cautions:["Reserve for resistant pathways","renal dose review"],coverage:{CRE:"strong",ESBL:"strong",Pseudomonas:"strong"}},
+  {key:"ceftolozane_tazobactam",name:"Ceftolozane-Tazobactam",route:"IV",cls:"Advanced β-lactam / inhibitor",notes:"Strong modern anti-pseudomonal option.",cautions:["Reserve for resistant pathways","renal dose review"],coverage:{Pseudomonas:"strong",E_coli:"strong"}},
+  {key:"vancomycin",name:"Vancomycin",route:"IV",cls:"Glycopeptide",notes:"Core MRSA ICU agent; no Gram-negative or anaerobic coverage.",cautions:["Nephrotoxicity","AUC/trough workflow","infusion reactions"],coverage:{MRSA:"strong",Enterococcus:"strong"}},
+  {key:"linezolid",name:"Linezolid",route:"IV/PO",cls:"Oxazolidinone",notes:"Strong MRSA and VRE option; no Gram-negative coverage.",cautions:["Thrombocytopenia","serotonergic interactions","neuropathy with prolonged use"],coverage:{MRSA:"strong",VRE:"strong"}},
+  {key:"daptomycin",name:"Daptomycin",route:"IV",cls:"Lipopeptide",notes:"Strong MRSA/VRE bloodstream option; not for pneumonia.",cautions:["CPK elevation","myopathy","not for pneumonia"],coverage:{MRSA:"strong",VRE:"strong"}},
+  {key:"amikacin",name:"Amikacin",route:"IV",cls:"Aminoglycoside",notes:"Strong Gram-negative add-on, often for synergy or resistance.",cautions:["Nephrotoxicity","ototoxicity","drug-level monitoring"],coverage:{Pseudomonas:"strong",E_coli:"strong"}},
+  {key:"gentamicin",name:"Gentamicin",route:"IV",cls:"Aminoglycoside",notes:"Gram-negative add-on with selected synergy roles.",cautions:["Nephrotoxicity","ototoxicity","drug-level monitoring"],coverage:{E_coli:"strong",Pseudomonas:"moderate"}},
+  {key:"levofloxacin",name:"Levofloxacin",route:"IV/PO",cls:"Fluoroquinolone",notes:"Respiratory Gram-negative option; resistance patterns matter.",cautions:["QT prolongation","tendon injury","CNS effects"],coverage:{Pseudomonas:"moderate",E_coli:"moderate"}},
+  {key:"moxifloxacin",name:"Moxifloxacin",route:"IV/PO",cls:"Fluoroquinolone",notes:"CAP and mixed flora option with some anaerobic value; not anti-pseudomonal.",cautions:["QT prolongation","CNS effects"],coverage:{Strep:"strong",Bacteroides:"moderate"}},
+  {key:"colistin",name:"Colistin",route:"IV",cls:"Polymyxin",notes:"Rescue/targeted MDR Gram-negative drug.",cautions:["Severe nephrotoxicity","neurotoxicity","specialist use"],coverage:{Acinetobacter:"strong",CRE:"moderate",Pseudomonas:"strong"}},
+  {key:"polymyxin_b",name:"Polymyxin B",route:"IV",cls:"Polymyxin",notes:"MDR Gram-negative salvage option similar to colistin.",cautions:["Nephrotoxicity","neurotoxicity","specialist use"],coverage:{Acinetobacter:"strong",CRE:"moderate"}},
+  {key:"tigecycline",name:"Tigecycline",route:"IV",cls:"Glycylcycline",notes:"Useful mixed resistant organism and anaerobe option; not anti-pseudomonal.",cautions:["Nausea/vomiting","mortality signal in some severe infections","specialist review"],coverage:{MRSA:"strong",VRE:"strong",Acinetobacter:"moderate",Bacteroides:"strong"}},
+  {key:"minocycline",name:"Minocycline",route:"IV/PO",cls:"Tetracycline",notes:"Useful especially in selected Acinetobacter pathways.",cautions:["Dizziness","photosensitivity","niche ICU use"],coverage:{Acinetobacter:"moderate"}},
+  {key:"metronidazole",name:"Metronidazole",route:"IV/PO",cls:"Nitroimidazole",notes:"Anaerobe-focused drug; pair it when mixed aerobic coverage is needed.",cautions:["Neuropathy with prolonged courses","metallic taste","drug interaction review"],coverage:{Bacteroides:"strong",Clostridium:"strong"}},
+  {key:"clindamycin",name:"Clindamycin",route:"IV/PO",cls:"Lincosamide",notes:"Gram-positive and anaerobic adjunct in selected contexts.",cautions:["High C. difficile risk","GI intolerance"],coverage:{MSSA:"moderate",Bacteroides:"moderate"}},
+  {key:"fosfomycin",name:"Fosfomycin",route:"PO",cls:"Special urinary agent",notes:"Mostly urinary-focused; useful in selected MDR UTI pathways.",cautions:["Use context-specific","not for broad ICU sepsis"],coverage:{E_coli:"strong",ESBL:"moderate"}},
+  {key:"nitrofurantoin",name:"Nitrofurantoin",route:"PO",cls:"Special urinary agent",notes:"Lower urinary-only drug; not for sepsis or bacteremia.",cautions:["Do not treat systemic infection with it","renal function restrictions"],coverage:{E_coli:"moderate",Enterococcus:"moderate"}}
+];
+
+const scenarioRequirements={
+  undifferentiated:["MRSA","Pseudomonas","E_coli","Klebsiella"],
+  vap:["MRSA","Pseudomonas","Klebsiella","Acinetobacter"],
+  cauti:["E_coli","Klebsiella","Enterococcus"],
+  bsi:["MRSA","E_coli","Klebsiella","Pseudomonas","Enterococcus"],
+  iab:["E_coli","Klebsiella","Bacteroides","Enterococcus"],
+  ssti:["MRSA","MSSA","E_coli","Bacteroides"]
+};
+
+const els={
+  abx1:document.getElementById("abx1"),
+  abx2:document.getElementById("abx2"),
+  abx2Field:document.getElementById("abx2Field"),
+  siteMode:document.getElementById("siteMode"),
+  comboMode:document.getElementById("comboMode"),
+  swapBtn:document.getElementById("swapBtn"),
+  coveragePanel:document.getElementById("coveragePanel"),
+  selectionSummary:document.getElementById("selectionSummary"),
+  suggestionList:document.getElementById("suggestionList"),
+  complicationList:document.getElementById("complicationList"),
+  coverageNotes:document.getElementById("coverageNotes"),
+  coveredCount:document.getElementById("coveredCount"),
+  strongCount:document.getElementById("strongCount"),
+  gapCount:document.getElementById("gapCount"),
+  routeMix:document.getElementById("routeMix"),
+  profileLabel:document.getElementById("profileLabel")
+};
+
+function populateDropdowns(){
+  [els.abx1,els.abx2].forEach(sel=>sel.innerHTML="");
+  antibiotics.forEach(abx=>{
+    els.abx1.add(new Option(`${abx.name} [${abx.route}]`,abx.key));
+    els.abx2.add(new Option(`${abx.name} [${abx.route}]`,abx.key));
+  });
+  els.abx1.value="pip_tazo";
+  els.abx2.value="vancomycin";
+}
+function getSelectedAntibiotics(){
+  const a1=antibiotics.find(a=>a.key===els.abx1.value);
+  const list=a1?[a1]:[];
+  if(els.comboMode.checked){
+    const a2=antibiotics.find(a=>a.key===els.abx2.value);
+    if(a2) list.push(a2);
+  }
+  return list;
+}
+function bestCoverage(key,selected){
+  let best="none";
+  selected.forEach(abx=>{
+    const g=abx.coverage[key]||"none";
+    if(gradeScore[g]>gradeScore[best]) best=g;
+  });
+  return best;
+}
+function buildResultMap(selected){
+  const out={};
+  pathogenGroups.forEach(group=>group.items.forEach(item=>out[item.key]=bestCoverage(item.key,selected)));
+  return out;
+}
+function renderCoveragePanel(selected,results){
+  const priority=new Set(scenarioRequirements[els.siteMode.value]||[]);
+  const frag=document.createDocumentFragment();
+  pathogenGroups.forEach(group=>{
+    const section=document.createElement("section");
+    section.className="coverage-group";
+    const header=document.createElement("div");
+    header.className="group-header";
+    header.innerHTML=`<div><div class="group-title">${group.badge} ${group.title}</div><div class="group-sub">${group.sub}</div></div><div class="group-sub">${group.items.length} shown</div>`;
+    section.appendChild(header);
+    const grid=document.createElement("div");
+    grid.className="coverage-grid";
+    group.items.forEach(item=>{
+      const grade=results[item.key]||"none";
+      const support=selected.filter(abx=>gradeScore[abx.coverage[item.key]||"none"]>0).map(abx=>abx.name).join(" + ")||"No selected support";
+      const tags=[`<span class="tag">${gradeLabel[grade]}</span>`];
+      if(priority.has(item.key)) tags.push('<span class="tag route">Priority</span>');
+      if(["MRSA","VRE","ESBL","CRE"].includes(item.key)) tags.push('<span class="tag res">Resistance</span>');
+      const card=document.createElement("div");
+      card.className=`bug-card cov-${grade}`;
+      card.innerHTML=`<div class="bug-title">${item.label}</div><div class="bug-tags">${tags.join("")}</div><div class="bug-note">Support: ${support}</div>`;
+      grid.appendChild(card);
+    });
+    section.appendChild(grid);
+    frag.appendChild(section);
+  });
+  els.coveragePanel.innerHTML="";
+  els.coveragePanel.appendChild(frag);
+}
+function renderSelectionSummary(selected){
+  els.selectionSummary.innerHTML="";
+  selected.forEach(abx=>{
+    const div=document.createElement("div");
+    div.className="list-item";
+    div.innerHTML=`<strong>${abx.name} [${abx.route}]</strong><div>${abx.cls}</div><div style="margin-top:4px;color:var(--muted)">${abx.notes}</div>`;
+    els.selectionSummary.appendChild(div);
+  });
+}
+function renderComplications(selected){
+  els.complicationList.innerHTML="";
+  selected.forEach(abx=>{
+    const div=document.createElement("div");
+    div.className="list-item";
+    div.innerHTML=`<strong>${abx.name}</strong><div>${abx.cautions.join(" • ")}</div>`;
+    els.complicationList.appendChild(div);
+  });
+}
+function renderSuggestions(selected,results){
+  const site=els.siteMode.value;
+  const priority=scenarioRequirements[site]||[];
+  const missing=priority.filter(k=>gradeScore[results[k]||"none"]<2);
+  const list=[];
+  if(site==="vap" && gradeScore[results.Pseudomonas||"none"]<2){
+    list.push({title:"Pseudomonas gap",body:"Consider cefepime, piperacillin-tazobactam, meropenem, imipenem, ceftazidime, or ceftolozane-tazobactam depending on local resistance."});
+  }
+  if((site==="vap"||site==="bsi"||site==="undifferentiated") && gradeScore[results.MRSA||"none"]<2){
+    list.push({title:"MRSA gap",body:"Consider vancomycin, linezolid, daptomycin (not for pneumonia), or ceftaroline when MRSA risk matters."});
+  }
+  if((site==="iab"||site==="ssti") && gradeScore[results.Bacteroides||"none"]<2){
+    list.push({title:"Anaerobic gap",body:"Consider metronidazole, piperacillin-tazobactam, meropenem, imipenem, ertapenem, or tigecycline depending on context."});
+  }
+  if(!els.comboMode.checked){
+    list.push({title:"Single-drug mode active",body:"Only slot 1 contributes to coverage. Enable combination therapy when you want regimen pairing."});
+  }
+  list.push({title:missing.length?"Priority gaps to review":"Priority targets covered",body:missing.length?missing.join(", "):"No major high-priority organism gaps are flagged for the current infection focus."});
+  els.suggestionList.innerHTML="";
+  list.forEach(item=>{
+    const div=document.createElement("div");
+    div.className="list-item";
+    div.innerHTML=`<strong>${item.title}</strong><div>${item.body}</div>`;
+    els.suggestionList.appendChild(div);
+  });
+}
+function renderNotes(){
+  const notes=[
+    "Coverage grades are simplified bedside labels, not MIC-based predictions.",
+    "Always confirm with the local antibiogram, patient allergy history, source control needs, and renal/hepatic dose adjustments.",
+    "This updated dataset adds missing ICU options such as cefoperazone-sulbactam, ceftazidime-avibactam, ceftolozane-tazobactam, ertapenem, ceftaroline, polymyxin B, gentamicin, moxifloxacin, minocycline, fosfomycin, and nitrofurantoin."
+  ];
+  els.coverageNotes.innerHTML=notes.map(t=>`<div class="list-item">${t}</div>`).join("");
+}
+function renderSummary(results,selected){
+  const allKeys=pathogenGroups.flatMap(g=>g.items.map(i=>i.key));
+  const priority=scenarioRequirements[els.siteMode.value]||[];
+  els.coveredCount.textContent=allKeys.filter(k=>gradeScore[results[k]||"none"]>0).length;
+  els.strongCount.textContent=allKeys.filter(k=>gradeScore[results[k]||"none"]>=2).length;
+  els.gapCount.textContent=priority.filter(k=>gradeScore[results[k]||"none"]<2).length;
+  els.routeMix.textContent=selected.map(x=>x.route).join(" + ")||"—";
+  els.profileLabel.textContent=getProfileLabel(results);
+}
+function getProfileLabel(results){
+  const hasMrsa=gradeScore[results.MRSA||"none"]>=2;
+  const hasPseudo=gradeScore[results.Pseudomonas||"none"]>=2;
+  const hasAna=gradeScore[results.Bacteroides||"none"]>=2;
+  if(hasMrsa&&hasPseudo&&hasAna) return "Broad ICU";
+  if(hasMrsa&&hasPseudo) return "MRSA + GN";
+  if(hasPseudo&&hasAna) return "GN + anaerobe";
+  if(hasMrsa) return "Gram+ heavy";
+  if(hasPseudo) return "Anti-pseudomonal";
+  if(hasAna) return "Anaerobe-heavy";
+  return "Narrow / mixed";
+}
+function toggleComboUI(){
+  const on=els.comboMode.checked;
+  els.abx2Field.classList.toggle("hidden",!on);
+  els.swapBtn.disabled=!on;
+}
+function render(){
+  toggleComboUI();
+  const selected=getSelectedAntibiotics();
+  const results=buildResultMap(selected);
+  renderCoveragePanel(selected,results);
+  renderSelectionSummary(selected);
+  renderComplications(selected);
+  renderSuggestions(selected,results);
+  renderNotes();
+  renderSummary(results,selected);
+}
+function init(){
+  populateDropdowns();
+  [els.abx1,els.abx2,els.siteMode,els.comboMode].forEach(el=>el.addEventListener("change",render));
+  els.swapBtn.addEventListener("click",()=>{
+    const a=els.abx1.value; els.abx1.value=els.abx2.value; els.abx2.value=a; render();
+  });
+  render();
+}
+init();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('./sw.js');
+      console.log('SW registered:', reg.scope);
+    } catch (err) {
+      console.error('SW registration failed:', err);
+    }
+  });
+}
+</script>
+
+</body>
+</html>
